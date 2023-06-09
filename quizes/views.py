@@ -4,6 +4,8 @@ from django.views.generic import ListView
 from django.http import JsonResponse
 from questions.models import Question, Answer
 from results.models import Result
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
 
 class QuizListView(ListView):
     model = Quiz 
@@ -26,8 +28,9 @@ def quiz_data_view(request, pk):
         'time': quiz.time,
     })
 
+@login_required
 def save_quiz_view(request, pk):
-    if request.is_ajax():
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         questions = []
         data = request.POST
         data_ = dict(data.lists())
@@ -35,13 +38,11 @@ def save_quiz_view(request, pk):
         data_.pop('csrfmiddlewaretoken')
 
         for k in data_.keys():
-            print('key: ', k)
             question = Question.objects.get(text=k)
             questions.append(question)
-        print(questions)
 
-        user = request.user
-        quiz = Quiz.objects.get(pk=pk)
+        user = request.user  # Ensure that the user is authenticated
+        quiz = get_object_or_404(Quiz, pk=pk)
 
         score = 0
         multiplier = 100 / quiz.number_of_questions
@@ -65,7 +66,7 @@ def save_quiz_view(request, pk):
                 results.append({str(q): {'correct_answer': correct_answer, 'answered': a_selected}})
             else:
                 results.append({str(q): 'not answered'})
-            
+
         score_ = score * multiplier
         Result.objects.create(quiz=quiz, user=user, score=score_)
 
